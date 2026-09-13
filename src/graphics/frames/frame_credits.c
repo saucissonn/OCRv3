@@ -1,12 +1,12 @@
-#include "../frame.h"
-#include "../gui_elements/rectangle.h"
-#include "../gui_elements/text.h"
-#include "../gui_elements/button.h"
-#include "../gui_elements/text_area.h"
-#include "../image_graphics.h"
-#include "../globals.h"
-#include "frames.h"
-#include "common_elements.h"
+#include "graphics/frame.h"
+#include "graphics/gui_elements/rectangle.h"
+#include "graphics/gui_elements/text.h"
+#include "graphics/gui_elements/button.h"
+#include "graphics/gui_elements/text_area.h"
+#include "graphics/image_graphics.h"
+#include "common/globals.h"
+#include "graphics/frames/frames.h"
+#include "graphics/frames/common_elements.h"
 
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>

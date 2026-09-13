@@ -1,9 +1,9 @@
-#include "button.h"
-#include "text.h"
-#include "rectangle.h"
-#include "../utils.h"
-#include "../frame.h"
-#include "../globals.h"
+#include "graphics/gui_elements/button.h"
+#include "graphics/gui_elements/text.h"
+#include "graphics/gui_elements/rectangle.h"
+#include "graphics/utils_graphics.h"
+#include "graphics/frame.h"
+#include "common/globals.h"
 
 #include <SDL2/SDL_ttf.h>
 #include <string.h>

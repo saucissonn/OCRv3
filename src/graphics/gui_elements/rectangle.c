@@ -1,6 +1,6 @@
-#include "rectangle.h"
-#include "../globals.h"
-#include "../utils.h"
+#include "graphics/gui_elements/rectangle.h"
+#include "common/globals.h"
+#include "graphics/utils_graphics.h"
 
 #include <SDL2/SDL.h>
 

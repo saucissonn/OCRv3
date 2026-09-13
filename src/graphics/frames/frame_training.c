@@ -1,16 +1,19 @@
-#include "../frame.h"
-#include "../gui_elements/text_area.h"
-#include "../image_graphics.h"
-#include "../globals.h"
-#include "frames.h"
-#include "common_elements.h"
-#include "../../ocr/neural_network/ocr.h"
-#include "../../ocr/useful/globals_ocr.h"
-#include "../../ocr/neural_network/save.h"
-#include "../../ocr/neural_network/train.h"
-#include "../../ocr/process_img/fs.h"
-#include "../update.h"
-#include "../utils.h"
+#include "graphics/frame.h"
+#include "graphics/gui_elements/rectangle.h"
+#include "graphics/gui_elements/text.h"
+#include "graphics/gui_elements/button.h"
+#include "graphics/gui_elements/text_area.h"
+#include "graphics/image_graphics.h"
+#include "common/globals.h"
+#include "graphics/frames/frames.h"
+#include "graphics/frames/common_elements.h"
+#include "ocr/neural_network/ocr.h"
+#include "common/globals.h"
+#include "ocr/neural_network/save.h"
+#include "ocr/neural_network/train.h"
+#include "ocr/process_img/fs.h"
+#include "graphics/update.h"
+#include "graphics/utils_graphics.h"
 
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
@@ -485,7 +488,7 @@ static void call_thread_ocr(void **data) // Calls setup_and_train_ocr()
 		curr = curr->next;
 	}
 
-	size_layers[c] = 10;
+	size_layers[c] = NB_OUTPUTS_OCR;
 
 	int *addr_nb_layers = malloc(sizeof(int));
 	*addr_nb_layers = nb_layers;

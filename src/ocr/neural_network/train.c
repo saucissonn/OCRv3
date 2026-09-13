@@ -1,9 +1,9 @@
-#include "train.h"
-#include "../useful/globals_ocr.h"
-#include "../process_img/image.h"
-#include "../process_img/detection.h"
-#include "../useful/matrix.h"
-#include "nn.h"
+#include "ocr/neural_network/train.h"
+#include "common/globals.h"
+#include "ocr/process_img/image.h"
+#include "ocr/process_img/detection.h"
+#include "ocr/useful/matrix.h"
+#include "ocr/neural_network/nn.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -209,8 +209,8 @@ void train(size_t nb_file, Ocr *ocr, int nb_threads)
     char file_img_name[255];
     char file_ans_name[255];
 
-    sprintf(file_img_name, "ocr/images/training/ribbon/%ld.png", nb_file);
-    sprintf(file_ans_name, "ocr/images/training/ribbon_ans/%ld.txt", nb_file);
+    sprintf(file_img_name, "src/ocr/images/training/ribbon/%ld.png", nb_file);
+    sprintf(file_ans_name, "src/ocr/images/training/ribbon_ans/%ld.txt", nb_file);
 
     FILE *ans = fopen(file_ans_name, "r");
 
@@ -227,7 +227,7 @@ void train(size_t nb_file, Ocr *ocr, int nb_threads)
     int *ans_list = malloc(file_size * sizeof(int));
 
     for (int i = 0; i < file_size; i++)
-        ans_list[i] = fgetc(ans) - '0';
+        ans_list[i] = fgetc(ans) - 'A';
 
     Image *img = load_png(file_img_name);
 

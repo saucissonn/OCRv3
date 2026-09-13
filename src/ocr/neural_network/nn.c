@@ -1,8 +1,8 @@
-#include "nn.h"
-#include "../useful/globals_ocr.h"
-#include "../process_img/image.h"
-#include "../useful/matrix.h"
-#include "../useful/utils.h"
+#include "ocr/neural_network/nn.h"
+#include "common/globals.h"
+#include "ocr/process_img/image.h"
+#include "ocr/useful/matrix.h"
+#include "ocr/useful/utils.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -85,6 +85,7 @@ void forward(Layer *l, int training)
 
 			curr->z[i] = sum;
 			curr->output[i] = sum;
+
 		}
 
 		if (curr->next)			

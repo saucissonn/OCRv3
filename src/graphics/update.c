@@ -1,11 +1,11 @@
-#include "globals.h"
-#include "gui_elements/rectangle.h"
-#include "gui_elements/text.h"
-#include "gui_elements/button.h"
-#include "update.h"
-#include "gui_elements/cursor.h"
-#include "utils.h"
-#include "globals.h"
+#include "common/globals.h"
+#include "graphics/gui_elements/rectangle.h"
+#include "graphics/gui_elements/text.h"
+#include "graphics/gui_elements/button.h"
+#include "graphics/update.h"
+#include "graphics/gui_elements/cursor.h"
+#include "graphics/utils_graphics.h"
+#include "common/globals.h"
 
 #include <SDL2/SDL.h>
 #include <stdio.h>
@@ -55,7 +55,7 @@ void resize_texts(SDL_Renderer *renderer, Text *texts) {
 
 		TTF_CloseFont(curr->font);
 		curr->font = NULL;
-        TTF_Font *font = TTF_OpenFont("graphics/DejaVuSans.ttf", curr->size * DELTA);
+        TTF_Font *font = TTF_OpenFont(FONT_PATH, curr->size * DELTA);
         curr->font = font;
 
 		SDL_Surface *surface = NULL;

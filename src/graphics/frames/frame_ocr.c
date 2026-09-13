@@ -1,17 +1,18 @@
-#include "../frame.h"
-#include "../gui_elements/rectangle.h"
-#include "../gui_elements/text.h"
-#include "../gui_elements/button.h"
-#include "../gui_elements/text_area.h"
-#include "../image_graphics.h"
-#include "../globals.h"
-#include "frames.h"
-#include "common_elements.h"
-#include "../../ocr/useful/globals_ocr.h"
-#include "../../ocr/useful/utils.h"
-#include "../../ocr/useful/matrix.h"
-#include "../../ocr/neural_network/save.h"
-#include "../../ocr/process_img/transform.h"
+#include "graphics/frame.h"
+#include "graphics/gui_elements/rectangle.h"
+#include "graphics/gui_elements/text.h"
+#include "graphics/gui_elements/button.h"
+#include "graphics/gui_elements/text_area.h"
+#include "graphics/image_graphics.h"
+#include "common/globals.h"
+#include "graphics/frames/frames.h"
+#include "graphics/frames/common_elements.h"
+#include "common/globals.h"
+#include "ocr/useful/utils.h"
+#include "ocr/useful/matrix.h"
+#include "ocr/neural_network/save.h"
+#include "ocr/process_img/transform.h"
+#include "ocr/process_img/detection.h"
 
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
@@ -77,37 +78,50 @@ static void button_launch_funtion(void **data)
 
     global_ocr = load_ocr(save);
 
-	int *sudoku = launch_ocr(frame->image, global_ocr);
-	if (!sudoku)
+	int *puzzle = launch_ocr(frame->image, global_ocr);
+/*	if (!puzzle)
 	{
+		printf("Error, button_launch_funtion, no puzzle found\n");
 		destroy_ocr(global_ocr);
 		return;
 	}
+*/
+    destroy_ocr(global_ocr);
+    global_ocr = NULL;
 
-	int *empty_sudoku = malloc(sizeof(int) * 81);
+	debug_puzzle_rectangles(frame->image);
+
+	SDL_DestroyTexture(frame->texture);
+	frame->texture = image_to_texture(Renderer, frame->image);
+
+	printf("Launch OCR\n");
+
+/*
+	int *empty = malloc(sizeof(int) * 81); // TODO not 81
 	for (int i = 0; i < 81; i++)
-		empty_sudoku[i] = sudoku[i];
+		empty[i] = puzzle[i];
 
     destroy_ocr(global_ocr);
     global_ocr = NULL;
 
 	printf("Before\n");
-	print_matrix_values(sudoku, 9, 9);
+	print_matrix_values(puzzle, 9, 9);
 
-	solve_sudoku(sudoku);
+	solve_puzzle(puzzle);
 
 	printf("After\n");
-	print_matrix_values(sudoku, 9, 9);
+	print_matrix_values(puzzle, 9, 9);
 
-	modify_sudoku_image(frame->image, empty_sudoku, sudoku);
+	modifyimage(frame->image, empty, puzzle);
 
 	SDL_DestroyTexture(frame->texture);
 	frame->texture = image_to_texture(Renderer, frame->image);
 	
-	free(sudoku);
-	free(empty_sudoku);
+	free(puzzle);
+	free(empty);
 
 	printf("Launch OCR\n");
+*/
 }
 
 static void button_save_funtion(void **data)

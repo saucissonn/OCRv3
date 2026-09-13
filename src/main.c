@@ -2,9 +2,9 @@
 #include "graphics/frames/frames.h"
 #include "graphics/events.h"
 #include "graphics/update.h"
-#include "graphics/utils.h"
-#include "graphics/globals.h"
-#include "ocr/useful/globals_ocr.h"
+#include "graphics/utils_graphics.h"
+#include "common/globals.h"
+#include "common/globals.h"
 #include "ocr/neural_network/ocr.h"
 #include "ocr/neural_network/save.h"
 

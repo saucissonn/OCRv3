@@ -1,244 +1,418 @@
-#include "../process_img/detection.h"
-#include "../useful/matrix.h"
+#include "ocr/process_img/detection.h"
+#include "ocr/process_img/image.h"
 
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
 
-int *detect_lines(Image *img, float size, int direction) // direction 0 is horizontal and 1 is vertical
+#include "ocr/useful/matrix.h"
+#include "ocr/useful/stack.h"
+
+void set_rectangles(Image *img)
 {
-    if (!img || !img->pixels || size <= 0.0f || size > 1.0f)
-        return NULL;
+	img->rectangles = get_rectangles(img);
 
-    int min_length = direction == 0 ? (int)(img->width * size) : (int)(img->height * size);
+	if (img->nb_rectangle < 16)
+	{
+		for (int i = 0; i < img->nb_rectangle; i++)
+		{
+			destroy_image_rect(img->rectangles[i]);
+		}
+		img->nb_rectangle = 0;
 
-    int capacity = 16;
-    int count = 0;
-    int *lines = malloc(capacity * 4 * sizeof(int));
+		binarize_threshold_mask(img, img->pixels, 220);
 
-    int first = 1;
-    int start_x = -1;
-    int end_x = -1;
-    int start_y = -1;
-    int end_y = -1;
-
-    int outer = direction == 0 ? img->height : img->width;
-    int inner = direction == 0 ? img->width : img->height;
-
-    for (int i = 0; i < outer; i++)
-    {
-        int j = 0;
-
-        while (j < inner)
-        {
-            // skip whites
-            while (j < inner)
-            {
-                int x = direction == 0 ? j : i;
-                int y = direction == 0 ? i : j;
-
-                if (img->pixels[y * img->width + x] != 0)
-                    break;
-
-                j++;
-            }
-
-            if (j >= inner)
-                break;
-
-            if (direction == 0)
-                start_x = j;
-            else
-                start_y = j;
-
-            // detect blacks
-            while (j < inner)
-            {
-                int x = direction == 0 ? j : i;
-                int y = direction == 0 ? i : j;
-
-                int black = img->pixels[y * img->width + x] == 1;
-
-                if (!black)
-                {
-                    int nx = direction == 0 ? j : i + 1;
-                    int ny = direction == 0 ? i + 1 : j;
-
-                    if ((direction == 0 && i + 1 < img->height) || (direction == 1 && i + 1 < img->width))
-                        black = img->pixels[ny * img->width + nx] == 1;
-                }
-
-                if (!black)
-                    break;
-
-                j++;
-            }
-
-            if (direction == 0)
-                end_x = j - 1;
-            else
-                end_y = j - 1;
-
-            int length = direction == 0 ? end_x - start_x + 1 : end_y - start_y + 1;
-
-            if (length >= min_length)
-            {
-                if (count == capacity)
-                {
-                    capacity *= 2;
-                    int *tmp = realloc(lines, capacity * 4 * sizeof(int));
-                    lines = tmp;
-                }
-
-                if (first)
-                {
-                    if (direction == 0)
-                    {
-                        start_y = i;
-                        end_y = i;
-                    }
-                    else
-                    {
-                        start_x = i;
-                        end_x = i;
-                    }
-
-                    first = 0;
-                }
-
-                if ((direction == 0 && i <= end_y + 1) || (direction == 1 && i <= end_x + 1))
-                {
-                    if (direction == 0)
-                        end_y = i;
-                    else
-                        end_x = i;
-                }
-                else
-                {
-                    lines[count * 4 + 0] = start_x;
-                    lines[count * 4 + 1] = start_y;
-                    lines[count * 4 + 2] = end_x;
-                    lines[count * 4 + 3] = end_y;
-
-                    if (direction == 0)
-                    {
-                        start_y = i;
-                        end_y = i;
-                    }
-                    else
-                    {
-                        start_x = i;
-                        end_x = i;
-                    }
-
-                    count++;
-                }
-            }
-        }
-    }
-
-    lines = realloc(lines, (count * 4 + 8) * sizeof(int));
-
-    lines[count * 4 + 0] = start_x;
-    lines[count * 4 + 1] = start_y;
-    lines[count * 4 + 2] = end_x;
-    lines[count * 4 + 3] = end_y;
-    lines[count * 4 + 4] = -1;
-    lines[count * 4 + 5] = -1;
-    lines[count * 4 + 6] = -1;
-    lines[count * 4 + 7] = -1;
-
-    return lines;
+		// This time with a higher threshold
+		img->rectangles = get_rectangles(img);
+	}
 }
 
-int *detect_squares(Image *img, float size_line)
+ImageRect **get_rectangles(Image *img)
 {
-	int *horizontals = detect_lines(img, size_line, 0);
-	int *verticals = detect_lines(img, size_line, 1);
-
-	if (!horizontals || !verticals || horizontals[0] == -1 || verticals[0] == -1)
-	{
-		free(horizontals);
-		free(verticals);
+	if (!img)
 		return NULL;
-	}
 
-	int nb_lines = 0;
-	for (int i = 0; horizontals[i] != -1; i+=4)
-		nb_lines += 1;
+	int rectangles_size = 32;
 
-	int *squares = malloc(4 * 81 * sizeof(int));
+	ImageRect **rectangles = malloc(sizeof(ImageRect *) * rectangles_size);
 
-	int count = 0;
+	uint8_t *visited = calloc(img->width * img->height, sizeof(uint8_t));
 
-	if (nb_lines == 10) // The sudoku is boxed
+	img->nb_rectangle = 0;
+
+	for (int y = 0; y < img->height; y++)
 	{
-		for (int i = 0; horizontals[i + 4] != -1; i+=4)
+		for (int x = 0; x < img->width; x++)
 		{
-			for (int j = 0; verticals[j + 4] != -1; j+=4)
+			int idx = y * img->width + x;
+
+			if (img->pixels[idx] == 1 && !visited[idx])
 			{
-				squares[count * 4 + 0] = verticals[j + 2] + 1;
-				squares[count * 4 + 1] = horizontals[i + 3] + 1;
-				squares[count * 4 + 2] = verticals[j + 4] - 1;
-				squares[count * 4 + 3] = horizontals[i + 5] - 1;
-				count++;
+				if (img->nb_rectangle >= rectangles_size)
+				{
+					rectangles_size *= 2;
+
+					rectangles = realloc(rectangles, sizeof(ImageRect *) * rectangles_size);
+				}
+
+				ImageRect *rect = dfs(img, x, y, visited);
+
+				if (rect)
+				{
+					// Erase too big and too small rectangles
+					if ((img->width * img->height / 10 <= rect->w * rect->h) || (rect->w * rect->h <= 25))
+					{
+						mask_puzzle_rectangles(img, rect);
+						destroy_image_rect(rect);
+					}
+					else
+					{
+						rectangles[img->nb_rectangle] = rect;
+						img->nb_rectangle++;
+						// print_image_rect(rect);
+					}
+				}
 			}
 		}
 	}
-	else if (nb_lines == 8)
+
+	free(visited);
+
+	return rectangles;
+}
+
+ImageRect *dfs(Image *img, int x, int y, uint8_t *visited)
+{
+	if (!img || !visited)
+		return NULL;
+
+	if (x < 0 || y < 0 || x >= img->width || y >= img->height)
+		return NULL;
+
+	if (img->pixels[y * img->width + x] != 1)
+		return NULL;
+
+	Stack *s = stack_create();
+	Coord coord;
+
+	ImageRect *rect = create_image_rect(img, x, y, x, y);
+
+	visited[y * img->width + x] = 1;
+	stack_push(s, x, y);
+
+	while (stack_pop(s, &coord) == 0)
 	{
-		int last_hor = 0;
-		for (int i = 0; horizontals[i] != -1; i+=4)
-			last_hor += 4;
+		add_point_image_rect(rect, img, coord.x, coord.y);
 
-		int last_vert = 0;
-		for (int j = 0; verticals[j] != -1; j+=4)
-			last_vert += 4;
+		for (int dy = -1; dy <= 1; dy++)
+		{
+			for (int dx = -1; dx <= 1; dx++)
+			{
+				if (dx == 0 && dy == 0)
+					continue;
 
-        for (int i = 0; horizontals[i + 4] != -1; i+=4)
-        {
-			int ti = i - 1;
-            for (int j = 0; verticals[j + 4] != -1; j+=4)
-            {
-				int tj = j - 1;
-				
-				if (tj >= 0)
-					squares[count * 4 + 0] = verticals[tj + 2] + 1;
-				else
-					squares[count * 4 + 0] = horizontals[0] - 1;
+				int nx = coord.x + dx;
+				int ny = coord.y + dy;
 
-				if (ti >= 0)
-					squares[count * 4 + 1] = horizontals[ti + 3] + 1;
-				else
-					squares[count * 4 + 1] = verticals[1] - 1;
+				if (nx < 0 || nx >= img->width || ny < 0 || ny >= img->height)
+					continue;
 
-				if (tj <= 9)
-					squares[count * 4 + 2] = verticals[tj + 4] - 1;
-				else
-					squares[count * 4 + 2] = horizontals[last_hor + 2] + 1;
+				int idx = ny * img->width + nx;
 
-                if (ti <= 9)
-					squares[count * 4 + 3] = horizontals[ti + 5] - 1;
-				else
-					squares[count * 4 + 3] = verticals[last_vert + 3] + 1;
-                count++;
-            }
-        }
+				if (img->pixels[idx] == 1 && !visited[idx])
+				{
+					visited[idx] = 1;
+					stack_push(s, nx, ny);
+				}
+			}
+		}
 	}
-	else
+
+	stack_free(s);
+
+	// print_image_rect(rect);
+
+	return rect;
+}
+
+int candidate_puzzle_rectangles(Image *img, int idx) // Get rid of letters which are too close
+{
+	double margin = 10.0;
+
+	ImageRect *rect = img->rectangles[idx];
+
+	for (int i = 0; i < img->nb_rectangle; i++)
 	{
-		free(horizontals);
-		free(verticals);
+		if (i != idx && ImageRectDistance(rect, img->rectangles[i]) <= margin)
+		{
+			return 0;
+		}
+	}
 
-		free(squares);
+	return 1;
+}
 
+// Get the distance of a rect to another (from their middle)
+void get_middle_distances_xy(int **distances_x, int **distances_y, Image *img, int margin)
+{
+	int size = img->nb_rectangle;
+
+	int margin_x = margin;
+	int margin_y = margin;
+
+	for (int i = 0; i < size; i++)
+	{
+		distances_x[i] = calloc(size, sizeof(int));
+		distances_y[i] = calloc(size, sizeof(int));
+
+		if (candidate_puzzle_rectangles(img, i))
+		{
+			ImageRect *rect = img->rectangles[i];
+
+			int middle_x = rect->x0 + (rect->x1 - rect->x0) / 2;
+			int middle_y = rect->y0 + (rect->y1 - rect->y0) / 2;
+			for (int j = 0; j < size; j++)
+			{
+				if (i != j)
+				{
+					ImageRect *target = img->rectangles[j];
+
+					int target_middle_x = target->x0 + (target->x1 - target->x0) / 2;
+					int target_middle_y = target->y0 + (target->y1 - target->y0) / 2;
+
+					if (middle_x - margin_x <= target_middle_x && target_middle_x <= middle_x + margin_x)
+					{
+						int d = target_middle_y - middle_y;
+						distances_y[i][j] = (d > 0) ? d : -d;
+					}
+
+					if (middle_y - margin_y <= target_middle_y && target_middle_y <= middle_y + margin_y)
+					{
+						int d = target_middle_x - middle_x;
+						distances_x[i][j] = (d > 0) ? d : -d;
+					}
+				}
+			}
+		}
+	}
+}
+
+// Get the most common distance x and y between 2 rectangles
+void get_all_xy_distances(int **distances_x, int **distances_y, int *all_x, int *all_y, Image *img, int *cx, int *cy)
+{
+	int size = img->nb_rectangle;
+
+	for (int i = 0; i < size; i++)
+	{
+		for (int j = 0; j < size && candidate_puzzle_rectangles(img, i); j++)
+		{
+			all_x[distances_x[i][j]] += 1;
+			all_y[distances_y[i][j]] += 1;
+		}
+	}
+
+	int max_w = img->width / 10;
+	int max_h = img->height / 10;
+
+	double maxi = 0;
+	int start = 10;
+	int common_x = start;
+	double attenuate = common_x; // Attenuate longer distances
+	for (int i = common_x; i < max_w; i++)
+	{
+		if (maxi < (all_x[i] / attenuate))
+		{
+			maxi = all_x[i] / attenuate;
+			common_x = i;
+		}
+		if (i % 10 == 0)
+		{
+			attenuate += 1;
+		}
+	}
+
+	maxi = 0;
+	int common_y = start;
+	attenuate = common_y;
+	for (int i = common_y; i < max_h; i++)
+	{
+		if (maxi < (all_y[i] / attenuate))
+		{
+			maxi = all_y[i] / attenuate;
+			common_y = i;
+		}
+		if (i % 10 == 0)
+		{
+			attenuate += 1;
+		}
+	}
+
+	*cx = common_x;
+	*cy = common_y;
+}
+
+// Eliminate a lot of dirty rect, find a lot of puzzle rect (not always all)
+// and also some word letters (we'll need to get rid of them)
+ImageRect **step1_puzzle_rectangles(Image *img)
+{
+	if (!img)
+	{
+		printf("Error, get_puzzle_rectangles, no image\n");
 		return NULL;
 	}
 
-	free(horizontals);
-	free(verticals);
+	// Get distances
+	int margin = 10;
 
-	return squares;
+	int size = img->nb_rectangle;
+	int **distances_x = malloc(sizeof(int *) * size);
+	int **distances_y = malloc(sizeof(int *) * size);
+
+	get_middle_distances_xy(distances_x, distances_y, img, margin);
+
+	// Get most common distances
+	int *all_x = calloc(img->width, sizeof(int));
+	int *all_y = calloc(img->height, sizeof(int));
+
+	int common_x = 1;
+	int common_y = 1;
+
+	get_all_xy_distances(distances_x, distances_y, all_x, all_y, img, &common_x, &common_y);
+
+	int tmp_size = 32;
+	int result_count = 0;
+	ImageRect **tmp = malloc(sizeof(ImageRect *) * tmp_size);
+
+	for (int i = 0; i < size; i++)
+	{
+		int stop = 0;
+		for (int j = 0; j < size && stop == 0 && candidate_puzzle_rectangles(img, i); j++)
+		{
+			if (i != j)
+			{
+				if (tmp_size <= result_count)
+				{
+					tmp_size *= 2;
+					tmp = realloc(tmp, sizeof(ImageRect *) * tmp_size);
+				}
+
+				// printf("i: %d, j:%d, x: %d, dy:%d\n", i, j, distances_x[i][j], distances_y[i][j]);
+
+				if (common_x - margin <= distances_x[i][j] && distances_x[i][j] <= common_x + margin)
+				{
+					for (int j2 = 0; j2 < size; j2++)
+					{
+						if (common_y - margin <= distances_y[i][j2] && distances_y[i][j2] <= common_y + margin)
+						{
+							tmp[result_count] = img->rectangles[i];
+							result_count += 1;
+							stop = 1;
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	img->nb_puzzle_rectangle = result_count;
+	ImageRect **result = tmp;
+
+	for (int i = 0; i < size; i++)
+	{
+		free(distances_x[i]);
+		free(distances_y[i]);
+	}
+	free(distances_x);
+	free(distances_y);
+	free(all_x);
+	free(all_y);
+
+	printf("COUNT: %d, common_x: %d, common_y:%d\n", img->nb_puzzle_rectangle, common_x, common_y);
+
+	return result;
+}
+
+// Assume that the image is oriented because we'll do it in
+// 4 directions anyway
+ImageRect **get_puzzle_rectangles(Image *img)
+{
+	if (!img)
+	{
+		printf("Error, get_puzzle_rectangles, no image\n");
+		return NULL;
+	}
+
+	set_rectangles(img);
+
+	// This step tries with a low threshold
+	ImageRect **result = step1_puzzle_rectangles(img);
+
+	// Step 1 failed
+	if (img->nb_puzzle_rectangle < 9)
+	{	
+		return NULL;
+	}
+
+	// Get the grid size
+	int x0 = -1;
+	int y0 = -1;
+	int x1 = -1;
+	int y1 = -1;
+
+	bounding_box_image_rects(result, img->nb_puzzle_rectangle, &x0, &y0, &x1, &y1);
+
+	int nb_x = find_max_puzzle_rectangles_x(result, img->nb_puzzle_rectangle, y0, y1);
+	int nb_y = find_max_puzzle_rectangles_y(result, img->nb_puzzle_rectangle, x0, x1);
+
+	printf("The grid is a: x=%d, y=%d\n", nb_x, nb_y);
+
+	// Erase rectangles to put new ones
+	for (int i = 0; i < img->nb_rectangle; i++)
+	{
+		destroy_image_rect(img->rectangles[i]);
+	}
+	img->nb_rectangle = 0;
+	free(result);
+
+	img->nb_puzzle_rectangle = nb_x * nb_y; // Size of the grid
+	result = malloc(sizeof(ImageRect *) * img->nb_puzzle_rectangle);
+
+	// Reconstruct the grid
+	int puzzle_w = x1 - x0;
+	int puzzle_h = y1 - y0;
+
+	double margin = 3.0;
+	double gap = 2.0 * margin;
+
+	double tile_w = (puzzle_w - (nb_x - 1) * gap) / nb_x;
+	double tile_h = (puzzle_h - (nb_y - 1) * gap) / nb_y;
+
+	for (int y = 0; y < nb_y; y++)
+	{
+		for (int x = 0; x < nb_x; x++)
+		{
+			int x0_ = x0 + x * (tile_w + gap);
+			int y0_ = y0 + y * (tile_h + gap);
+			int x1_ = x0 + x * (tile_w + gap) + tile_w;
+			int y1_ = y0 + y * (tile_h + gap) + tile_h;
+
+			result[y * nb_x + x] = create_image_rect(img, x0_, y0_, x1_, y1_);
+		}
+	}
+
+	return result;
+}
+
+ImageRect **get_word_rectangles(Image *img)
+{
+	if (!img)
+	{
+		printf("Error, get_word_rectangles, no image\n");
+		return NULL;
+	}
+
+	return NULL;
 }
 
 int *get_bbox(int *matrix, int w, int h, int *x0, int *y0, int *x1, int *y1)
@@ -279,95 +453,43 @@ int *get_bbox(int *matrix, int w, int h, int *x0, int *y0, int *x1, int *y1)
 	{
 		for (int x = 0; x < bw; x++)
 		{
-			bbox[y * bw + x] =
-				matrix[(*y0 + y) * w + (*x0 + x)];
+			bbox[y * bw + x] = matrix[(*y0 + y) * w + (*x0 + x)];
 		}
 	}
 
 	return bbox;
 }
 
-int **get_squares_sudoku(Image *img)
+void debug_puzzle_rectangles(Image *img)
 {
-    int *squares_coordinates = detect_squares(img, 0.3);
-	if (!squares_coordinates)
+	if (!img || !img->puzzle_rectangles)
 	{
-		return NULL;
+		return;
 	}
 
-    int **squares = malloc(81 * sizeof(int *));
-
-    for (int i = 0; i < 81; i++)
-    {
-/*
-        printf("group %d : x0 = %d, y0 = %d, x1 = %d, y1 = %d\n",
-		        i, squares_coordinates[4 * i + 0], squares_coordinates[4 * i + 1],
-		        squares_coordinates[4 * i + 2], squares_coordinates[4 * i + 3]);
-*/
-		int border_w = 3;
-
-		squares[i] = coordinates_to_matrix(img,
-											squares_coordinates[4 * i + 0] + border_w,
-											squares_coordinates[4 * i + 1] + border_w,
-											squares_coordinates[4 * i + 2] - border_w,
-											squares_coordinates[4 * i + 3] - border_w);
-		int *save = squares[i];
-
-		int x0 = 0;
-		int y0 = 0;
-        int x1 = 0;
-        int y1 = 0;
-
-		int *bbox = get_bbox(squares[i],
-								squares_coordinates[4 * i + 2] - squares_coordinates[4 * i + 0] + 1 - 2 * border_w,
-								squares_coordinates[4 * i + 3] - squares_coordinates[4 * i + 1] + 1 - 2 * border_w,
-								&x0, &y0, &x1, &y1);
-
-		if (!bbox)
+	for (int r = 0; r < img->nb_puzzle_rectangle; r++)
+	{
+		ImageRect *rect = img->puzzle_rectangles[r];
+		for (int y = 0; y < rect->h; y++)
 		{
-			squares[i] = matrix_to_28x28(squares[i],
-                                squares_coordinates[4 * i + 2] - squares_coordinates[4 * i + 0] + 1 - 2 * border_w,
-                                squares_coordinates[4 * i + 3] - squares_coordinates[4 * i + 1] + 1 - 2 * border_w);
+			for (int x = 0; x < rect->w; x++)
+			{
+				img->pixels[(rect->y0 + y) * img->width + rect->x0 + x] = 2;
+			}
 		}
-
-		else
-			squares[i] = matrix_to_28x28(bbox, (x1 - x0 + 1), (y1 - y0 + 1));
-
-        free(save);
-		free(bbox);
-		//print_matrix(squares[i], 28, 28);
-    }
-
-	free(squares_coordinates);
-	//img->squares_coordinates = squares_coordinates;
-
-	return squares;
+	}
 }
 
-int *get_valid_squares(int **squares)
+void mask_puzzle_rectangles(Image *img, ImageRect *rect)
 {
-	if (!squares) return NULL;
-
-	int *res = malloc(81 * sizeof(int));
-
-	for (int i = 0; i < 81; i++)
-    {
-        double sum = 0;
-		int border_w = 3;
-        for (int y = border_w; y < 28 - border_w; y++)
-        {
-            for (int x = border_w; x < 28 - border_w; x++)
-            {
-                if (squares[i][y * 28 + x])
-                    sum++;
-            }
-        }
-
-        if ((sum / ((28. - border_w) * (28. - border_w))) > 0.03)
-			res[i] = 1;
-        else
-			res[i] = 0;
-    }
-
-	return res;
+	for (int y = 0; y < rect->h; y++)
+	{
+		for (int x = 0; x < rect->w; x++)
+		{
+			if (rect->pixels[y][x] == 1)
+			{
+				img->pixels[(rect->y0 + y) * img->width + rect->x0 + x] = 0;
+			}
+		}
+	}
 }

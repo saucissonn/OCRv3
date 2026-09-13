@@ -1,5 +1,6 @@
-#include "layer.h"
-#include "../useful/utils.h"
+#include "ocr/neural_network/layer.h"
+#include "ocr/useful/utils.h"
+#include "common/globals.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -56,7 +57,7 @@ Layer *init_layers()
 
     int nb_input = 28 * 28;
     int nb_hidden = 256;
-    int nb_output = 10; // Digits from 1 to 9
+    int nb_output = NB_OUTPUTS_OCR; // A-Z
 
     Layer *input = create_layer("input", nb_input, nb_input); // We use a 28 * 28 image
 

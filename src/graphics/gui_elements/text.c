@@ -1,5 +1,5 @@
-#include "text.h"
-#include "../globals.h"
+#include "graphics/gui_elements/text.h"
+#include "common/globals.h"
 
 #include <SDL2/SDL_ttf.h>
 #include <string.h>
@@ -33,7 +33,7 @@ Text *create_text(char *text, float x, float y, float size, SDL_Color color)
         res->len_max = 1;
 	res->default_len = res->len_max;
 
-	TTF_Font *font = TTF_OpenFont("graphics/DejaVuSans.ttf", size * DELTA);
+	TTF_Font *font = TTF_OpenFont(FONT_PATH, size * DELTA);
 	res->font = font;
 
 	SDL_Surface *surface_temp = TTF_RenderUTF8_Blended(font, ".", color);

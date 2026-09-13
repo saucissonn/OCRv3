@@ -1,4 +1,4 @@
-#include "matrix.h"
+#include "ocr/useful/matrix.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -64,10 +64,74 @@ int *matrix_to_28x28(int *matrix, int w, int h)
     return out;
 }
 
+uint8_t **expand_matrix(uint8_t **matrix, int w, int h, int new_w, int new_h)
+{
+	if (!matrix || w <= 0 || h <= 0 || new_w < w || new_h < h)
+		return matrix;
+
+	if (new_w == w && new_h == h)
+		return matrix;
+
+    uint8_t **new_matrix = realloc(matrix, new_h * sizeof(uint8_t *));
+
+    matrix = new_matrix;
+
+    for (int y = 0; y < h; y++)
+    {
+		matrix[y] = realloc(matrix[y], new_w * sizeof(uint8_t));
+
+        for (int x = w; x < new_w; x++)
+            matrix[y][x] = 0;
+    }
+
+    for (int y = h; y < new_h; y++)
+    {
+        matrix[y] = calloc(new_w, sizeof(uint8_t));
+    }
+
+    return matrix;
+}
+
+void shift_matrix(uint8_t **matrix, int w, int h, int shift_x, int shift_y)
+{
+    if (matrix == NULL || w <= 0 || h <= 0)
+        return;
+
+    uint8_t **tmp = malloc(h * sizeof(uint8_t *));
+
+    for (int y = 0; y < h; y++)
+    {
+        tmp[y] = calloc(w, sizeof(uint8_t));
+	}
+
+    for (int y = 0; y < h; y++)
+    {
+	   for (int x = 0; x < w; x++)
+        {
+            int new_x = x + shift_x;
+            int new_y = y + shift_y;
+
+            if (new_x >= 0 && new_x < w && new_y >= 0 && new_y < h)
+            {
+                tmp[new_y][new_x] = matrix[y][x];
+            }
+        }
+    }
+
+    for (int y = 0; y < h; y++)
+    {
+        for (int x = 0; x < w; x++)
+            matrix[y][x] = tmp[y][x];
+
+        free(tmp[y]);
+    }
+
+    free(tmp);
+}
+
 void print_matrix(int *matrix, int w, int h)
 {
-    if (!matrix || w <= 0 || h <= 0)
-        return;
+    if (!matrix || w <= 0 || h <= 0) return;
 
     for (int y = 0; y < h; y++)
     {

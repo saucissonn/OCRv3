@@ -1,8 +1,8 @@
-#include "ocr.h"
-#include "../useful/globals_ocr.h"
-#include "../process_img/transform.h"
-#include "../useful/matrix.h"
-#include "nn.h"
+#include "ocr/neural_network/ocr.h"
+#include "common/globals.h"
+#include "ocr/process_img/transform.h"
+#include "ocr/useful/matrix.h"
+#include "ocr/neural_network/nn.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -82,7 +82,7 @@ Ocr *init_ocr()
 	size_layers[0] = 28 * 28;
     size_layers[1] = 256;
     size_layers[2] = 128;
-    size_layers[3] = 10;
+    size_layers[3] = NB_OUTPUTS_OCR;
 
 	Ocr *res = create_ocr(0.01, nb_layers, size_layers);
 
@@ -196,105 +196,14 @@ int *launch_ocr(Image *img, Ocr *ocr)
 {
     ocr->training = 0;
 
-    double h_angle = hough_angle(img, 0.1);
-    printf("angle: %lf\n", h_angle);
+	
+	//free(img->puzzle_rectangles);
+    //free(img->word_rectangles);    
 
-	free(img->squares_coordinates);
-	free(img->valid_squares);
-    rotate_image(img, -h_angle);
+//	double h_angle = hough_angle(img, 0.1);
+//	printf("angle: %lf\n", h_angle);
+//	rotate_image(img, -h_angle);
     process_image(img);
 
-    if (!img->valid_squares)
-    {
-        printf("No squares detected on the image\n");
-        return NULL;
-    }
-
-    double rotations_sum[4] = {0};
-
-    int **sudokus = malloc(sizeof(int *) * 4);
-    for (int i = 0; i < 4; i++)
-        sudokus[i] = malloc(sizeof(int) * 81);
-
-    for (int rot = 0; rot < 4; rot++)
-    {
-        if (rot != 0)
-        {
-		    for (int i = 0; i < 81; i++)
-			    free(img->squares[i]);
-			free(img->squares);
-			free(img->squares_coordinates);
-			free(img->valid_squares);
-            rotate_image(img, 90);
-            process_image(img);
-        }
-
-        for (int i = 0; i < 81; i++)
-        {
-            if (img->valid_squares[i])
-            {
-                double idx_max_output_sum[10] = {0};
-
-                for (int j = 0; j < 10; j++)
-                {
-                    put_in_input(img->squares[i], 28, 28, ocr->nn);
-                    forward(ocr->nn, ocr->training);
-
-                    Layer *output_layer = get_output_layer(ocr->nn);
-                    soft_max(output_layer);
-
-                    int idx = index_max_output(output_layer);
-                    idx_max_output_sum[idx] += output_layer->output[idx];
-                }
-
-                int maxi = 0;
-                for (int j = 1; j < 10; j++)
-                {
-                    if (idx_max_output_sum[j] > idx_max_output_sum[maxi])
-                        maxi = j;
-                }
-
-                if (maxi != 0)
-                    rotations_sum[rot] += idx_max_output_sum[maxi];
-
-                sudokus[rot][i] = maxi;
-            }
-            else
-            {
-                sudokus[rot][i] = 0;
-            }
-        }
-    }
-
-    int best_rot = 0;
-    for (int i = 1; i < 4; i++)
-    {
-        if (rotations_sum[i] > rotations_sum[best_rot])
-            best_rot = i;
-    }
-
-    printf("best: %d\n", best_rot);
-
-    int *res = malloc(sizeof(int) * 81);
-    for (int i = 0; i < 81; i++)
-        res[i] = sudokus[best_rot][i];
-
-    for (int i = 0; i < 4; i++)
-        free(sudokus[i]);
-    free(sudokus);
-
-    int delta = (best_rot * 90 - 270 + 360) % 360;
-
-    for (int i = 0; i < delta / 90; i++)
-        rotate_image(img, 90);
-
-	for (int i = 0; i < 81; i++)
-		free(img->squares[i]);
-	free(img->squares);
-	free(img->squares_coordinates);
-	free(img->valid_squares);
-
-    process_image(img);
-
-    return res;
+    return NULL;
 }

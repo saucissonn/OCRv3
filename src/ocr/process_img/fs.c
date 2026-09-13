@@ -1,4 +1,4 @@
-#include "fs.h"
+#include "ocr/process_img/fs.h"
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,9 +1,9 @@
-#include "cursor.h"
-#include "text.h"
-#include "rectangle.h"
-#include "../utils.h"
-#include "../frame.h"
-#include "../globals.h"
+#include "graphics/gui_elements/cursor.h"
+#include "graphics/gui_elements/text.h"
+#include "graphics/gui_elements/rectangle.h"
+#include "graphics/utils_graphics.h"
+#include "graphics/frame.h"
+#include "common/globals.h"
 
 #include <math.h>
 #include <SDL2/SDL_ttf.h>

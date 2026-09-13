@@ -3,11 +3,11 @@
 #include <stdio.h>
 #include <ctype.h>
 
-#include "globals.h"
-#include "gui_elements/button.h"
-#include "frame.h"
-#include "image_graphics.h"
-#include "../ocr/process_img/image.h"
+#include "common/globals.h"
+#include "graphics/gui_elements/button.h"
+#include "graphics/frame.h"
+#include "graphics/image_graphics.h"
+#include "ocr/process_img/image.h"
 
 void handle_event_button(Button *button) {
 	if (button->interactible && button->function) {
@@ -119,7 +119,7 @@ int handle_events(SDL_Event event, Frame *frame) {
 					if (frame->current_text_area->digits && isdigit(c) ||
 						frame->current_text_area->alpha && (isalpha(c) || c == '_'))
 					{
-						TTF_Font *font = TTF_OpenFont("graphics/DejaVuSans.ttf", (int)(frame->current_text_area->text->size * DELTA));
+						TTF_Font *font = TTF_OpenFont(FONT_PATH, (int)(frame->current_text_area->text->size * DELTA));
 
 						char buff[2];
 						buff[0] = c;

@@ -1,5 +1,5 @@
-#include "save.h"
-#include "../useful/globals_ocr.h"
+#include "ocr/neural_network/save.h"
+#include "common/globals.h"
 
 #include <stdio.h>
 #include <stdlib.h>

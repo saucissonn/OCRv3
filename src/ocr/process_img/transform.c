@@ -1,5 +1,5 @@
-#include "transform.h"
-#include "../../graphics/globals.h"
+#include "ocr/process_img/transform.h"
+#include "common/globals.h"
 
 #include <stdlib.h>
 #include <math.h>
@@ -13,11 +13,9 @@ void rotate_image(Image *src, double angle)
     double c = cos(rad);
     double s = sin(rad);
 
-    int new_width =
-        (int)(fabs(src->width * c) + fabs(src->height * s) + 0.5);
+    int new_width = (int)(fabs(src->width * c) + fabs(src->height * s) + 0.5);
 
-    int new_height =
-        (int)(fabs(src->width * s) + fabs(src->height * c) + 0.5);
+    int new_height = (int)(fabs(src->width * s) + fabs(src->height * c) + 0.5);
 
     uint8_t *new_pixels = malloc(new_width * new_height);
     Pixel *new_raw_pixels = malloc(sizeof(Pixel) * new_width * new_height);
@@ -269,61 +267,11 @@ double hough_angle(Image *img, double precision)
     return best;
 }
 
-void modify_sudoku_image(Image *img, int *empty_sudoku, int *solved_sudoku)
+void modify_image(Image *img, char *empty, char *solved)
 {
-	if (!img)
+	if (!img || !empty || !solved)
+		printf("Error, modify_image, NULL input\n");
 	    return;
 
-	if (!img->squares_coordinates)
-	{
-	    printf("No squares coordinates\n");
-	    return;
-	}
-
-	SDL_Texture *texture = image_to_texture(Renderer, img);
-
-	int size = (img->squares_coordinates[3] - img->squares_coordinates[1]);
-
-	TTF_Font *font = TTF_OpenFont("graphics/DejaVuSans.ttf", size);
-
-	uint8_t r, g, b, a;
-
-	for (int i = 0; i < 81; i++)
-	{
-		if (empty_sudoku[i] != 0)
-			continue;
-
-		char buff[2];
-		buff[0] = solved_sudoku[i] + '0';
-		buff[1] = '\0';
-
-		SDL_Surface *surface = TTF_RenderUTF8_Blended(font, buff, Black);
-
-		Uint32 *pixels = (Uint32 *)surface->pixels;
-
-		int start_x = img->squares_coordinates[4 * i + 0];
-		int start_y = img->squares_coordinates[4 * i + 1];
-
-		for (int y = 0; y < surface->h; y++)
-		{
-			for (int x = 0; x < surface->w; x++)
-			{
-				Uint32 *row = (Uint32 *)((Uint8 *)surface->pixels + y * surface->pitch);
-				Uint32 pixel = row[x];
-				SDL_GetRGBA(pixel, surface->format, &r, &g, &b, &a);
-
-				if (a == 0)
-					continue;
-
-				img->raw_pixels[(start_y + y) * img->width + start_x + x].r = r;
-                img->raw_pixels[(start_y + y) * img->width + start_x + x].g = g;
-                img->raw_pixels[(start_y + y) * img->width + start_x + x].b = b;
-				img->raw_pixels[(start_y + y) * img->width + start_x + x].a = a;
-			}
-		}
-
-		SDL_FreeSurface(surface);	
-	}
-
-	TTF_CloseFont(font);
+	printf("modify image done\n");
 }
