@@ -121,6 +121,11 @@ Image *load_png(const char *filename)
 	img->puzzle_rectangles = NULL;
 	img->word_rectangles = NULL;
 
+	img->px0 = -1;
+	img->py0 = -1;
+	img->px1 = -1;
+	img->py1 = -1;
+
 	return img;
 }
 
@@ -160,7 +165,7 @@ void free_image(Image *img)
 	{
         for (int i = 0; i < img->nb_word_rectangle; i++)
         {
-            destroy_image_rect(img->word_rectangles[i]);
+            destroy_image_rect_group(img->word_rectangles[i]);
         }
 	}
 	free(img->word_rectangles);
@@ -219,10 +224,14 @@ SDL_Texture *image_to_texture(SDL_Renderer *renderer, Image *img)
 				gd = 255;
 				bd = 255;
 			}
-			else if (img->pixels[y * img->width + x] == 2) // Debug color
+			else if (img->pixels[y * img->width + x] == 2) // Debug color puzzle
 			{
 				rd = 255;
 			}
+            else if (img->pixels[y * img->width + x] == 3) // Debug color word
+            {
+                bd = 255;
+            }
 
 			pixels[y * img->width + x] = SDL_MapRGBA(surface->format, rd, gd, bd, a);
 		}
@@ -545,4 +554,68 @@ int find_max_puzzle_rectangles_y(ImageRect **rects, int nb, int x0, int x1)
 	}
 
 	return maxi;
+}
+
+ImageRectGroup *create_image_rect_group(Image *img, int x0, int y0, int x1, int y1)
+{
+    if (!img)
+    {
+        printf("Error, create_image_rect_group, no image found\n");
+        return NULL;
+    }
+
+    if (x0 < 0 || y0 < 0 || x0 >= img->width || 0 >= img->height)
+    {
+        printf("Error, create_image_rect_group, invalid coordinates\n");
+        return NULL;
+    }
+
+    if (x1 < x0 || y1 < y0 || x1 >= img->width || y1 >= img->height)
+    {
+        printf("Error, create_image_rect_group, invalid coordinates\n");
+        return NULL;
+    }
+
+    ImageRectGroup *res = malloc(sizeof(ImageRectGroup));
+
+    res->x0 = x0;
+    res->y0 = y0;
+    res->x1 = x1;
+    res->y1 = y1;
+
+    res->w = x1 - x0 + 1;
+    res->h = y1 - y0 + 1;
+
+	res->nb_char = 0;	
+	res->chars = NULL;
+
+    return res;
+}
+
+void destroy_image_rect_group(ImageRectGroup *rect)
+{
+    if (!rect) return;
+
+    if (!rect->chars)
+    {
+        free(rect);
+        return;
+    }
+
+    for (int y = 0; y < rect->nb_char; y++)
+    {
+        destroy_image_rect(rect->chars[y]);
+    }
+    free(rect);
+}
+
+void add_to_image_rect_group(ImageRectGroup *rect_grp, ImageRect *rect)
+{
+    if (!rect) return;
+    
+	rect_grp->nb_char += 1;
+
+	rect_grp->chars = realloc(rect_grp->chars, sizeof(ImageRect *) * rect_grp->nb_char);
+	
+	rect_grp->chars[rect_grp->nb_char - 1] = rect;
 }

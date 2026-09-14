@@ -90,6 +90,7 @@ static void button_launch_funtion(void **data)
     global_ocr = NULL;
 
 	debug_puzzle_rectangles(frame->image);
+	debug_word_rectangles(frame->image);
 
 	SDL_DestroyTexture(frame->texture);
 	frame->texture = image_to_texture(Renderer, frame->image);

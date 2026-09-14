@@ -21,6 +21,19 @@ typedef struct {
 } ImageRect;
 
 typedef struct {
+    int x0;
+    int y0;
+    int x1;
+    int y1;
+
+    int w;
+    int h;
+
+	int nb_char;
+	ImageRect **chars;
+} ImageRectGroup;
+
+typedef struct {
     int width;
     int height;
     uint8_t *pixels;    // 0 = white, 1 = black
@@ -32,7 +45,13 @@ typedef struct {
 
 	ImageRect **rectangles;
 	ImageRect **puzzle_rectangles;
-    ImageRect **word_rectangles;
+    ImageRectGroup **word_rectangles;
+
+    // Puzzle rect coordinates
+    int px0;
+	int py0;
+	int px1;
+	int py1;
 } Image;
 
 void binarize_threshold_mask(Image *img, uint8_t *mask, int th);
@@ -56,5 +75,9 @@ double ImageRectDistance(ImageRect *a, ImageRect *b);
 void bounding_box_image_rects(ImageRect **rects, int nb, int *x0, int *y0, int *x1, int *y1);
 int find_max_puzzle_rectangles_x(ImageRect **rects, int nb, int y0, int y1);
 int find_max_puzzle_rectangles_y(ImageRect **rects, int nb, int x0, int x1);
+
+ImageRectGroup *create_image_rect_group(Image *img, int x0, int y0, int x1, int y1);
+void destroy_image_rect_group(ImageRectGroup *rect);
+void add_to_image_rect_group(ImageRectGroup *rect_grp, ImageRect *rect);
 
 #endif

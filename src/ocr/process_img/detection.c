@@ -10,6 +10,11 @@
 
 void set_rectangles(Image *img)
 {
+    if (img->nb_puzzle_rectangle > 0)
+    {
+        clean_around_puzzle(img, 20);
+    }
+
 	img->rectangles = get_rectangles(img);
 
 	if (img->nb_rectangle < 16)
@@ -46,7 +51,12 @@ ImageRect **get_rectangles(Image *img)
 		{
 			int idx = y * img->width + x;
 
-			if (img->pixels[idx] == 1 && !visited[idx])
+			// In puzzle rect (because we found it we ignore it)
+			if (img->px0 <= x &&  x <= img->px1 && img->py0 <= y && y <= img->py1)
+			{
+				continue;
+			}
+			else if (img->pixels[idx] == 1 && !visited[idx])
 			{
 				if (img->nb_rectangle >= rectangles_size)
 				{
@@ -135,10 +145,8 @@ ImageRect *dfs(Image *img, int x, int y, uint8_t *visited)
 	return rect;
 }
 
-int candidate_puzzle_rectangles(Image *img, int idx) // Get rid of letters which are too close
+int far_rectangle(Image *img, int idx, int margin) // Tell if letters are too close or too far
 {
-	double margin = 10.0;
-
 	ImageRect *rect = img->rectangles[idx];
 
 	for (int i = 0; i < img->nb_rectangle; i++)
@@ -165,7 +173,7 @@ void get_middle_distances_xy(int **distances_x, int **distances_y, Image *img, i
 		distances_x[i] = calloc(size, sizeof(int));
 		distances_y[i] = calloc(size, sizeof(int));
 
-		if (candidate_puzzle_rectangles(img, i))
+		if (far_rectangle(img, i, 10))
 		{
 			ImageRect *rect = img->rectangles[i];
 
@@ -204,7 +212,7 @@ void get_all_xy_distances(int **distances_x, int **distances_y, int *all_x, int 
 
 	for (int i = 0; i < size; i++)
 	{
-		for (int j = 0; j < size && candidate_puzzle_rectangles(img, i); j++)
+		for (int j = 0; j < size && far_rectangle(img, i, 10); j++)
 		{
 			all_x[distances_x[i][j]] += 1;
 			all_y[distances_y[i][j]] += 1;
@@ -286,7 +294,7 @@ ImageRect **step1_puzzle_rectangles(Image *img)
 	for (int i = 0; i < size; i++)
 	{
 		int stop = 0;
-		for (int j = 0; j < size && stop == 0 && candidate_puzzle_rectangles(img, i); j++)
+		for (int j = 0; j < size && stop == 0 && far_rectangle(img, i, 10); j++)
 		{
 			if (i != j)
 			{
@@ -401,10 +409,15 @@ ImageRect **get_puzzle_rectangles(Image *img)
 		}
 	}
 
+	img->px0 = x0;
+	img->py0 = y0;
+	img->px1 = x1;
+	img->py1 = y1;
+
 	return result;
 }
 
-ImageRect **get_word_rectangles(Image *img)
+ImageRectGroup **get_word_rectangles(Image *img)
 {
 	if (!img)
 	{
@@ -412,7 +425,51 @@ ImageRect **get_word_rectangles(Image *img)
 		return NULL;
 	}
 
-	return NULL;
+	img->nb_word_rectangle = 0;
+	set_rectangles(img);
+
+	int size_grp = 1;
+	ImageRectGroup **result = malloc(sizeof(ImageRectGroup *) * size_grp);
+
+	int margin = 20;
+	for (int i = 0; i < img->nb_rectangle; i++)
+	{
+		if (size_grp <= img->nb_word_rectangle)
+		{
+			size_grp *= 2;
+			result = realloc(result, sizeof(ImageRectGroup *) * size_grp);
+		}
+
+		if (!far_rectangle(img, i, margin))
+		{
+			ImageRect *rect = img->rectangles[i];
+			ImageRect *copy = create_image_rect(img, rect->x0, rect->y0, rect->x1, rect->y1);
+
+			if (img->nb_word_rectangle == 0)
+			{
+				img->nb_word_rectangle += 1;
+                result[0] = create_image_rect_group(img, rect->x0, rect->y0, rect->x1, rect->y1);
+			}
+
+			ImageRectGroup *last_grp = result[img->nb_word_rectangle - 1];
+
+			if (!(last_grp->nb_char == 0 || ImageRectDistance(last_grp->chars[last_grp->nb_char - 1], rect) <= margin))
+			{
+				img->nb_word_rectangle += 1;
+				result[img->nb_word_rectangle - 1] = create_image_rect_group(img, rect->x0, rect->y0, rect->x1, rect->y1);
+			}
+
+			add_to_image_rect_group(result[img->nb_word_rectangle - 1], copy);
+		}
+	}
+
+    for (int i = 0; i < img->nb_rectangle; i++)
+    {
+        destroy_image_rect(img->rectangles[i]);
+    }
+    img->nb_rectangle = 0;
+
+	return result;
 }
 
 int *get_bbox(int *matrix, int w, int h, int *x0, int *y0, int *x1, int *y1)
@@ -492,4 +549,48 @@ void mask_puzzle_rectangles(Image *img, ImageRect *rect)
 			}
 		}
 	}
+}
+
+void clean_around_puzzle(Image *img, int margin)
+{
+    for (int y = 0; y < img->height; y++)
+    {
+        for (int x = 0; x < img->width; x++)
+        {
+            if (x >= img->px0 - margin &&
+                x <= img->px1 + margin &&
+                y >= img->py0 - margin &&
+                y <= img->py1 + margin)
+            {
+                if (x < img->px0 || x > img->px1 ||
+                    y < img->py0 || y > img->py1)
+                {
+                    img->pixels[y * img->width + x] = 0;
+                }
+            }
+        }
+    }
+}
+
+void debug_word_rectangles(Image *img)
+{
+    if (!img || !img->puzzle_rectangles)
+    {
+        return;
+    }
+
+    for (int grp = 0; grp < img->nb_word_rectangle; grp++)
+    {
+		for (int r = 0; r < img->word_rectangles[grp]->nb_char; r++)
+		{
+			ImageRect *rect = img->word_rectangles[grp]->chars[r];
+			for (int y = 0; y < rect->h; y++)
+			{
+				for (int x = 0; x < rect->w; x++)
+				{
+					img->pixels[(rect->y0 + y) * img->width + rect->x0 + x] = 3;
+				}
+			}
+		}
+    }
 }
